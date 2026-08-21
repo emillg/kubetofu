@@ -261,8 +261,6 @@ make manifests generate
 
 ## Local testing with kind and Podman
 
-This guide runs the full workflow — build, deploy, and run the sample module — on a local [kind](https://kind.sigs.k8s.io/) cluster using [Podman](https://podman.io/) instead of Docker. All Makefile image targets accept `CONTAINER_TOOL=podman`, and kind is pointed at Podman via `KIND_EXPERIMENTAL_PROVIDER=podman`.
-
 ### 1. Prerequisites
 
 - **Podman 4.0+** (`podman --version`)
@@ -270,11 +268,7 @@ This guide runs the full workflow — build, deploy, and run the sample module �
 - **kubectl**
 - **Go 1.26+** — to build the manager and runner images from source
 
-> **macOS / Windows**: Podman runs inside a VM. On first use run `podman machine init`, then `podman machine start` (start it again after reboots). Verify with `podman info`.
-
 ### 2. Create the kind cluster
-
-kind auto-detects its container runtime, but when both Docker and Podman are installed it prefers Docker. Force Podman explicitly:
 
 ```bash
 export KIND_EXPERIMENTAL_PROVIDER=podman
@@ -295,8 +289,6 @@ make docker-build CONTAINER_TOOL=podman IMG=example.com/kubetofu:v0.0.1
 make docker-build-runner CONTAINER_TOOL=podman RUNNER_IMG=example.com/kubetofu/tofu-runner:v0.0.1
 ```
 
-Use a **non-`:latest` tag**: for `:latest` images the kubelet defaults to `imagePullPolicy: Always` and will try to pull from a registry instead of using the image you load into kind.
-
 ### 4. Load the images into the cluster
 
 ```bash
@@ -313,7 +305,7 @@ kind load image-archive /tmp/kubetofu-runner.tar --name kubetofu
 make deploy IMG=example.com/kubetofu:v0.0.1
 ```
 
-This installs the CRDs, RBAC, and the manager Deployment into `kubetofu` (it only uses kubectl + kustomize, so the container tool is irrelevant). Verify:
+This installs the CRDs, RBAC, and the manager Deployment into `kubetofu`. Verify:
 
 ```bash
 kubectl get pods -n kubetofu
@@ -331,13 +323,6 @@ spec:
     image: example.com/kubetofu/tofu-runner:v0.0.1
 ```
 
-or patch the running sample later:
-
-```bash
-kubectl patch tofumodule tofumodule-sample --type merge \
-  -p '{"spec":{"runner":{"image":"example.com/kubetofu/tofu-runner:v0.0.1"}}}'
-```
-
 ### 7. Run the quick start
 
 ```bash
@@ -345,7 +330,7 @@ kubectl apply -f config/samples/tofu_v1alpha1_tofumodule.yaml
 kubectl get tofumodules -w
 ```
 
-Then follow [Quick start](#quick-start) to approve and apply. Skipping step 6 shows up as `ErrImagePull` on the run Jobs.
+Then follow [Quick start](#quick-start) to approve and apply.
 
 ### 8. Debugging
 
