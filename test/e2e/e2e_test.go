@@ -36,7 +36,7 @@ import (
 )
 
 // namespace where the project is deployed in
-const namespace = "kubetofu-system"
+const namespace = "kubetofu"
 
 // serviceAccountName created for the project
 const serviceAccountName = "kubetofu-controller-manager"

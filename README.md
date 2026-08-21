@@ -1,6 +1,6 @@
 # kubetofu
 
-**kubetofu** is a Kubernetes operator that manages [OpenTofu](https://opentofu.org/) — the open-source, MPL-licensed alternative to Terraform — declaratively. You describe *what* infrastructure you want in a `TofuModule` custom resource, and the operator runs OpenTofu to plan and apply it, stores state in Secrets, and re-checks for drift on a schedule.
+**kubetofu** is a Kubernetes operator that manages [OpenTofu](https://opentofu.org/) declaratively. You describe *what* infrastructure you want in a `TofuModule` custom resource, and the operator runs OpenTofu to plan and apply it, stores state in Secrets, and re-checks for drift on a schedule.
 
 It's a GitOps-style workflow for OpenTofu, running inside your cluster instead of on a laptop or in CI:
 
@@ -33,11 +33,13 @@ The controller watches `TofuModule` resources and drives each one through a stat
 | `Failed` | The last run failed |
 | `Suspended` | Reconciliation is paused (`spec.paused: true`) |
 
-Each run executes as a Kubernetes Job in the module's namespace, running the `tofu-runner` image. The runner clones the module source, runs `tofu init` + `tofu plan` (or `tofu apply` with the saved plan), and writes results back to Secrets. Failed run Jobs are **kept** (rather than deleted) so their pod logs remain available for debugging — they are cleaned up by the Job TTL (10 minutes) and replaced by a retry after the configured interval:
+Each run executes as a Kubernetes Job in the module's namespace, running the `tofu-runner` image. The runner clones the module source, runs `tofu init` + `tofu plan` (or `tofu apply` with the saved plan), and writes results back to Secrets:
 
 - **State** — `tofu-<module>-state` (key `terraform.tfstate`)
 - **Plan** — `tofu-<module>-plan-<hash>` (keys `plan.tfplan`, `plan.txt`)
 - **Outputs** — `tofu-<module>-outputs` (key `outputs.json`)
+
+Failed run Jobs are kept so their pod logs remain available for debugging — they are cleaned up by the Job TTL (10 minutes) and replaced by a retry after the configured interval.
 
 Module outputs from the last successful apply are also surfaced in `status.outputs` (sensitive outputs are reported by name only).
 
@@ -61,14 +63,15 @@ export IMG=<registry>/kubetofu:latest
 # build and push the manager image
 make docker-build docker-push CONTAINER_TOOL=podman IMG=$IMG
 
-# optionally build and push the runner image (used by run Jobs)
+# build and push the runner image used by run Jobs (required — the default
+# ghcr.io/kubetofu/tofu-runner:latest is not published yet, see Known limitations)
 make docker-build-runner docker-push CONTAINER_TOOL=podman RUNNER_IMG=ghcr.io/kubetofu/tofu-runner:latest
 
 # deploy CRDs, RBAC, and the manager into your cluster
 make deploy IMG=$IMG
 ```
 
-This deploys the controller into the `kubetofu-system` namespace.
+This deploys the controller into the `kubetofu` namespace.
 
 ### Option 2: Single-file installer bundle
 
@@ -84,7 +87,7 @@ This is convenient for scripting or distributing to clusters without kustomize.
 ### Verify the installation
 
 ```bash
-kubectl get pods -n kubetofu-system
+kubectl get pods -n kubetofu
 # NAME                                         READY   STATUS    RESTARTS   AGE
 # kubetofu-controller-manager-7f8b9c5d6-abcde  1/1     Running   0          2m
 
@@ -151,8 +154,6 @@ spec:
   variables:
     - name: region
       value: eu-west-1
-  approvePlan: true        # set to false for a manual-approval workflow
-  interval: 10m
 ```
 
 ## Configuration reference
@@ -224,7 +225,7 @@ runner:
 
 If you supply your own `serviceAccountName`, you are responsible for granting it permission to read/write the module's Secrets. Otherwise the controller provisions a `tofu-runner` ServiceAccount with scoped Secret permissions in the module's namespace.
 
-The controller-wide default runner image can be set with the `--runner-image` flag on the manager (it defaults to `ghcr.io/kubetofu/tofu-runner:latest`).
+The controller-wide default runner image can be set with the `--runner-image` flag on the manager (it defaults to `ghcr.io/kubetofu/tofu-runner:latest`). That default is **not published yet** — until it is, run Jobs will fail with `ErrImagePull` unless you set `spec.runner.image` here (or `--runner-image` on the manager) to an image your cluster can pull.
 
 ### `spec.interval`
 
@@ -312,10 +313,10 @@ kind load image-archive /tmp/kubetofu-runner.tar --name kubetofu
 make deploy IMG=example.com/kubetofu:v0.0.1
 ```
 
-This installs the CRDs, RBAC, and the manager Deployment into `kubetofu-system` (it only uses kubectl + kustomize, so the container tool is irrelevant). Verify:
+This installs the CRDs, RBAC, and the manager Deployment into `kubetofu` (it only uses kubectl + kustomize, so the container tool is irrelevant). Verify:
 
 ```bash
-kubectl get pods -n kubetofu-system
+kubectl get pods -n kubetofu
 # kubetofu-controller-manager-7f8b9c5d6-abcde   1/1   Running   0   2m
 ```
 
@@ -349,7 +350,7 @@ Then follow [Quick start](#quick-start) to approve and apply. Skipping step 6 sh
 ### 8. Debugging
 
 ```bash
-kubectl logs -n kubetofu-system deployment/kubetofu-controller-manager -c manager -f
+kubectl logs -n kubetofu deployment/kubetofu-controller-manager -c manager -f
 kubectl get jobs -o wide
 kubectl describe pod -l job-name=<run-job>
 ```
@@ -379,6 +380,7 @@ make test-e2e
 
 ## Known limitations
 
+- The default runner image `ghcr.io/kubetofu/tofu-runner:latest` is not published yet — until it is, every module must set `spec.runner.image` (or the manager must be started with `--runner-image`) to an image your cluster can pull.
 - `spec.module.git.secretRef` is declared in the API but not yet wired into the runner — private git repos over HTTPS/SSH with credentials are not supported yet (workaround: mount credentials via the runner pod's ServiceAccount/image).
 - `spec.module.git.ref` is checked out with `git clone --branch`; commit SHAs are not supported, only branches and tags.
 - Plans and state are stored in Secrets, which have a 1 MiB size limit — very large plans may fail to persist.
