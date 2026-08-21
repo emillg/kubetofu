@@ -158,7 +158,7 @@ func LoadImageToKindClusterWithName(name string) error {
 	if err != nil {
 		return fmt.Errorf("creating temp archive: %w", err)
 	}
-	defer os.Remove(archive.Name())
+	defer func() { _ = os.Remove(archive.Name()) }()
 
 	save := exec.Command(containerTool, "save", name)
 	save.Stdout = archive

@@ -65,7 +65,8 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
-	flag.StringVar(&runnerImage, "runner-image", "", "Default container image used to execute OpenTofu runs (overridden by spec.runner.image).")
+	flag.StringVar(&runnerImage, "runner-image", "", "Default container image used to execute OpenTofu runs "+
+		"(overridden by spec.runner.image).")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+

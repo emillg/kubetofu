@@ -17,12 +17,13 @@ limitations under the License.
 package controller
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"time"
 
@@ -329,7 +330,7 @@ func (r *TofuModuleReconciler) createRun(ctx context.Context, cr *tofuv1alpha1.T
 	}
 
 	seq := cr.Status.RunSequence + 1
-	job, err := r.buildRunnerJob(ctx, cr, action, reason, hash, seq)
+	job, err := r.buildRunnerJob(cr, action, reason, hash, seq)
 	if err != nil {
 		return err
 	}
@@ -351,7 +352,7 @@ func (r *TofuModuleReconciler) createRun(ctx context.Context, cr *tofuv1alpha1.T
 }
 
 // buildRunnerJob builds the runner Job for a plan or apply run.
-func (r *TofuModuleReconciler) buildRunnerJob(ctx context.Context, cr *tofuv1alpha1.TofuModule, action, reason, hash string, seq int64) (*batchv1.Job, error) {
+func (r *TofuModuleReconciler) buildRunnerJob(cr *tofuv1alpha1.TofuModule, action, reason, hash string, seq int64) (*batchv1.Job, error) {
 	image := DefaultRunnerImage
 	sa := runnerSA
 	if r.RunnerImage != "" {
@@ -669,6 +670,6 @@ func parseOutputs(data []byte) ([]tofuv1alpha1.Output, error) {
 		}
 		outputs = append(outputs, out)
 	}
-	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
+	slices.SortFunc(outputs, func(a, b tofuv1alpha1.Output) int { return cmp.Compare(a.Name, b.Name) })
 	return outputs, nil
 }

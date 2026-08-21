@@ -17,8 +17,9 @@ limitations under the License.
 package controller
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
 	"strconv"
 	"time"
 
@@ -84,14 +85,14 @@ func listTestJobs(name, action string) []batchv1.Job {
 		client.MatchingLabels{moduleLabelKey: name, actionLabelKey: action},
 	)).To(Succeed())
 	out := jobs.Items
-	sort.Slice(out, func(i, j int) bool { return jobSeq(&out[i]) < jobSeq(&out[j]) })
+	slices.SortFunc(out, func(a, b batchv1.Job) int { return cmp.Compare(jobSeq(&a), jobSeq(&b)) })
 	return out
 }
 
 // finishTestJob marks a Job as completed or failed in the apiserver.
 func finishTestJob(job *batchv1.Job, succeeded bool) {
 	now := metav1.Now()
-	start := metav1.NewTime(now.Time.Add(-time.Minute))
+	start := metav1.NewTime(now.Add(-time.Minute))
 	job.Status.StartTime = &start
 	if succeeded {
 		job.Status.Succeeded = 1
