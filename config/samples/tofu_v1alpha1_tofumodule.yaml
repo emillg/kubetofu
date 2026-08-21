@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: kubetofu
+    app.kubernetes.io/managed-by: kustomize
+  name: tofumodule-sample-config
+data:
+  # Trivial module so the quick start works with no external dependencies
+  # (no git clone, no providers to download). Swap this for your own .tf files.
+  main.tf: |
+    output "greeting" {
+      value = "hello-from-kubetofu"
+    }
+---
+apiVersion: tofu.kubetofu.io/v1alpha1
+kind: TofuModule
+metadata:
+  labels:
+    app.kubernetes.io/name: kubetofu
+    app.kubernetes.io/managed-by: kustomize
+  name: tofumodule-sample
+spec:
+  module:
+    # Use a git source instead to pull a real module:
+    # git:
+    #   url: https://github.com/my-org/my-infra
+    #   ref: main
+    #   subPath: modules/eks
+    configMapRef:
+      name: tofumodule-sample-config
+  # Variables are passed to the module as a terraform.tfvars.json. Secret and
+  # ConfigMap references via valueFrom must exist in the module's namespace:
+  # variables:
+  #   - name: region
+  #     value: us-east-1
+  #   - name: api_token
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: provider-creds
+  #         key: api_token
+  # backend:
+  #   type: s3
+  #   config:
+  #     bucket: my-tfstate
+  #     key: demo.tfstate
+  approvePlan: false
+  runner:
+    image: example.com/kubetofu/tofu-runner:v0.0.1
+  #   resources:
+  #     limits:
+  #       cpu: 500m
+  #       memory: 512Mi
+  interval: 10m

@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- tofu_v1alpha1_tofumodule.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples
